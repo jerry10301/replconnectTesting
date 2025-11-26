@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Shield, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -113,7 +113,14 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-medium">Password</FormLabel>
+                    <div className="flex items-center justify-between">
+                      <FormLabel className="text-sm font-medium">Password</FormLabel>
+                      <Link href="/forgot-password">
+                        <span className="text-sm text-primary hover:underline cursor-pointer" data-testid="link-forgot-password">
+                          Forgot password?
+                        </span>
+                      </Link>
+                    </div>
                     <FormControl>
                       <div className="relative">
                         <Input

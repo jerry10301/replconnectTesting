@@ -9,7 +9,7 @@ import {
   generateToken,
   type AuthenticatedRequest 
 } from "./auth";
-import { loginSchema, createUserSchema, updateUserSchema, updateProfileSchema } from "@shared/schema";
+import { loginSchema, createUserSchema, updateUserSchema, updateProfileSchema, requestPasswordResetSchema, resetPasswordSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -190,6 +190,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Get stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/request-password-reset", async (req, res) => {
+    try {
+      const result = requestPasswordResetSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
+
+      const { email } = result.data;
+      const user = await storage.getUserByEmail(email);
+
+      if (!user) {
+        return res.json({ 
+          message: "If an account exists with this email, a password reset link will be sent.",
+          success: true
+        });
+      }
+
+      await storage.invalidateUserPasswordResetTokens(user.id);
+      const resetToken = await storage.createPasswordResetToken(user.id);
+
+      console.log(`[Password Reset] Token created for ${email}: ${resetToken.token}`);
+      console.log(`[Password Reset] Reset link: /reset-password?token=${resetToken.token}`);
+
+      res.json({ 
+        message: "If an account exists with this email, a password reset link will be sent.",
+        success: true,
+        token: resetToken.token
+      });
+    } catch (error) {
+      console.error("Request password reset error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const result = resetPasswordSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
+
+      const { token, password } = result.data;
+      const resetToken = await storage.getValidPasswordResetToken(token);
+
+      if (!resetToken) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      await storage.updateUser(resetToken.userId, { password: hashedPassword });
+
+      await storage.markPasswordResetTokenUsed(resetToken.id);
+
+      res.json({ 
+        message: "Password has been reset successfully. You can now log in with your new password.",
+        success: true
+      });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/auth/verify-reset-token", async (req, res) => {
+    try {
+      const { token } = req.query;
+      
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ message: "Token is required", valid: false });
+      }
+
+      const resetToken = await storage.getValidPasswordResetToken(token);
+
+      if (!resetToken) {
+        return res.status(400).json({ message: "Invalid or expired reset token", valid: false });
+      }
+
+      res.json({ valid: true });
+    } catch (error) {
+      console.error("Verify reset token error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

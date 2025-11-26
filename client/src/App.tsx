@@ -13,6 +13,8 @@ import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import UsersPage from "@/pages/users";
 import ProfilePage from "@/pages/profile";
+import ForgotPasswordPage from "@/pages/forgot-password";
+import ResetPasswordPage from "@/pages/reset-password";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ 
@@ -85,6 +87,14 @@ function Router() {
     <Switch>
       <Route path="/login">
         {isAuthenticated ? <Redirect to="/dashboard" /> : <LoginPage />}
+      </Route>
+
+      <Route path="/forgot-password">
+        {isAuthenticated ? <Redirect to="/dashboard" /> : <ForgotPasswordPage />}
+      </Route>
+
+      <Route path="/reset-password">
+        {isAuthenticated ? <Redirect to="/dashboard" /> : <ResetPasswordPage />}
       </Route>
       
       <Route path="/dashboard">
