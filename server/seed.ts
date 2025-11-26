@@ -1,8 +1,9 @@
-import { db } from "./db";
-import { users } from "@shared/schema";
+import { db, schema } from "./db";
 import bcrypt from "bcrypt";
 import { eq } from "drizzle-orm";
+import crypto from "crypto";
 
+const { users } = schema;
 const SALT_ROUNDS = 10;
 
 async function seed() {
@@ -16,14 +17,17 @@ async function seed() {
 
   if (existingAdmin.length === 0) {
     const hashedPassword = await bcrypt.hash("admin123", SALT_ROUNDS);
+    const id = crypto.randomUUID();
     
     await db.insert(users).values({
+      id,
       username: "admin",
       email: "admin@example.com",
       password: hashedPassword,
       name: "Administrator",
       role: "admin",
-    });
+      createdAt: new Date(),
+    } as any);
     
     console.log("Created default admin user:");
     console.log("  Username: admin");
@@ -40,14 +44,17 @@ async function seed() {
 
   if (existingUser.length === 0) {
     const hashedPassword = await bcrypt.hash("user123", SALT_ROUNDS);
+    const id = crypto.randomUUID();
     
     await db.insert(users).values({
+      id,
       username: "user",
       email: "user@example.com",
       password: hashedPassword,
       name: "Regular User",
       role: "user",
-    });
+      createdAt: new Date(),
+    } as any);
     
     console.log("Created default regular user:");
     console.log("  Username: user");
