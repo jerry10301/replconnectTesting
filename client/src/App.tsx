@@ -15,6 +15,7 @@ import UsersPage from "@/pages/users";
 import ProfilePage from "@/pages/profile";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
+import AuditLogsPage from "@/pages/audit-logs";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ 
@@ -112,6 +113,12 @@ function Router() {
       <Route path="/profile">
         <AuthenticatedLayout>
           <ProtectedRoute component={ProfilePage} />
+        </AuthenticatedLayout>
+      </Route>
+
+      <Route path="/audit-logs">
+        <AuthenticatedLayout>
+          <ProtectedRoute component={AuditLogsPage} adminOnly />
         </AuthenticatedLayout>
       </Route>
       

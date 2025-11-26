@@ -1,4 +1,4 @@
-import { users, passwordResetTokens, type User, type InsertUser, type UserWithoutPassword, type PasswordResetToken } from "@shared/schema";
+import { users, passwordResetTokens, auditLogs, type User, type InsertUser, type UserWithoutPassword, type PasswordResetToken, type AuditLog, type ActionType } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, gte, sql, and, isNull, gt } from "drizzle-orm";
 import crypto from "crypto";
@@ -19,6 +19,17 @@ export interface IStorage {
   getValidPasswordResetToken(token: string): Promise<PasswordResetToken | undefined>;
   markPasswordResetTokenUsed(id: string): Promise<void>;
   invalidateUserPasswordResetTokens(userId: string): Promise<void>;
+  createAuditLog(log: {
+    actorId?: string;
+    actorName: string;
+    action: ActionType;
+    targetId?: string;
+    targetName?: string;
+    details?: string;
+    ipAddress?: string;
+  }): Promise<AuditLog>;
+  getAuditLogs(limit?: number, offset?: number): Promise<AuditLog[]>;
+  getAuditLogCount(): Promise<number>;
 }
 
 function excludePassword(user: User): UserWithoutPassword {
@@ -148,6 +159,36 @@ export class DatabaseStorage implements IStorage {
           isNull(passwordResetTokens.usedAt)
         )
       );
+  }
+
+  async createAuditLog(log: {
+    actorId?: string;
+    actorName: string;
+    action: ActionType;
+    targetId?: string;
+    targetName?: string;
+    details?: string;
+    ipAddress?: string;
+  }): Promise<AuditLog> {
+    const [auditLog] = await db
+      .insert(auditLogs)
+      .values(log)
+      .returning();
+    return auditLog;
+  }
+
+  async getAuditLogs(limit: number = 50, offset: number = 0): Promise<AuditLog[]> {
+    return db
+      .select()
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getAuditLogCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` }).from(auditLogs);
+    return Number(result[0].count);
   }
 }
 

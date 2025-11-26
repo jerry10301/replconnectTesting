@@ -5,7 +5,8 @@ import {
   LogOut, 
   Shield,
   User as UserIcon,
-  UserCircle
+  UserCircle,
+  History
 } from "lucide-react";
 import {
   Sidebar,
@@ -35,6 +36,11 @@ const adminMenuItems = [
     title: "User Management",
     url: "/users",
     icon: Users,
+  },
+  {
+    title: "Audit Logs",
+    url: "/audit-logs",
+    icon: History,
   },
 ];
 

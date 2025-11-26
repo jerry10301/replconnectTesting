@@ -41,6 +41,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { password: _, ...userWithoutPassword } = user;
       const token = generateToken(userWithoutPassword);
 
+      await storage.createAuditLog({
+        actorId: user.id,
+        actorName: user.name,
+        action: "login",
+        details: `User logged in successfully`,
+        ipAddress: req.ip || req.socket.remoteAddress,
+      });
+
       res.json({ 
         token, 
         user: userWithoutPassword 
@@ -91,6 +99,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         password: hashedPassword,
         name,
         role,
+      });
+
+      await storage.createAuditLog({
+        actorId: req.user?.id,
+        actorName: req.user?.name || "System",
+        action: "create_user",
+        targetId: user.id,
+        targetName: user.name,
+        details: `Created user ${user.username} (${user.email}) with role ${user.role}`,
+        ipAddress: req.ip || req.socket.remoteAddress,
       });
 
       const { password: _, ...userWithoutPassword } = user;
@@ -144,6 +162,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      await storage.createAuditLog({
+        actorId: req.user?.id,
+        actorName: req.user?.name || "System",
+        action: "update_user",
+        targetId: user.id,
+        targetName: user.name,
+        details: `Updated user ${user.username}: ${Object.keys(result.data).join(", ")}`,
+        ipAddress: req.ip || req.socket.remoteAddress,
+      });
+
       const { password: _, ...userWithoutPassword } = user;
       res.json(userWithoutPassword);
     } catch (error) {
@@ -160,11 +188,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Cannot delete your own account" });
       }
 
+      const userToDelete = await storage.getUser(id);
+      if (!userToDelete) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
       const deleted = await storage.deleteUser(id);
       
       if (!deleted) {
         return res.status(404).json({ message: "User not found" });
       }
+
+      await storage.createAuditLog({
+        actorId: req.user?.id,
+        actorName: req.user?.name || "System",
+        action: "delete_user",
+        targetId: id,
+        targetName: userToDelete.name,
+        details: `Deleted user ${userToDelete.username} (${userToDelete.email})`,
+        ipAddress: req.ip || req.socket.remoteAddress,
+      });
 
       res.status(204).send();
     } catch (error) {
@@ -360,10 +403,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
+      const updateDetails = [];
+      if (name) updateDetails.push("name");
+      if (email) updateDetails.push("email");
+      if (newPassword) updateDetails.push("password");
+
+      await storage.createAuditLog({
+        actorId: req.user.id,
+        actorName: user.name,
+        action: newPassword ? "password_change" : "profile_update",
+        targetId: req.user.id,
+        targetName: updatedUser.name,
+        details: `Updated profile: ${updateDetails.join(", ")}`,
+        ipAddress: req.ip || req.socket.remoteAddress,
+      });
+
       const { password: _, ...userWithoutPassword } = updatedUser;
       res.json(userWithoutPassword);
     } catch (error) {
       console.error("Update profile error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/audit-logs", authMiddleware, adminMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const [logs, totalCount] = await Promise.all([
+        storage.getAuditLogs(limit, offset),
+        storage.getAuditLogCount(),
+      ]);
+
+      res.json({
+        logs,
+        total: totalCount,
+        limit,
+        offset,
+      });
+    } catch (error) {
+      console.error("Get audit logs error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

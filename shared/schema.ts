@@ -24,6 +24,30 @@ export const passwordResetTokens = pgTable("password_reset_tokens", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const actionTypeEnum = pgEnum("action_type", [
+  "login",
+  "logout",
+  "create_user",
+  "update_user",
+  "delete_user",
+  "password_reset_request",
+  "password_reset_complete",
+  "profile_update",
+  "password_change"
+]);
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  actorId: varchar("actor_id").references(() => users.id, { onDelete: "set null" }),
+  actorName: text("actor_name").notNull(),
+  action: actionTypeEnum("action").notNull(),
+  targetId: varchar("target_id"),
+  targetName: text("target_name"),
+  details: text("details"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   email: true,
@@ -87,3 +111,5 @@ export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type PasswordResetToken = typeof passwordResetTokens.$inferSelect;
 export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type ActionType = typeof actionTypeEnum.enumValues[number];
