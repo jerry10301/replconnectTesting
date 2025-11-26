@@ -1,7 +1,21 @@
-import { users, passwordResetTokens, auditLogs, type User, type InsertUser, type UserWithoutPassword, type PasswordResetToken, type AuditLog, type ActionType } from "@shared/schema";
-import { db } from "./db";
+import { db, schema } from "./db";
 import { eq, desc, gte, sql, and, isNull, gt } from "drizzle-orm";
 import crypto from "crypto";
+
+const { users, passwordResetTokens, auditLogs } = schema;
+
+type User = typeof schema.users.$inferSelect;
+type InsertUser = {
+  username: string;
+  email: string;
+  password: string;
+  role?: "admin" | "user";
+  name: string;
+};
+type UserWithoutPassword = Omit<User, "password">;
+type PasswordResetToken = typeof schema.passwordResetTokens.$inferSelect;
+type AuditLog = typeof schema.auditLogs.$inferSelect;
+type ActionType = "login" | "logout" | "create_user" | "update_user" | "delete_user" | "password_reset_request" | "password_reset_complete" | "profile_update" | "password_change";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -54,9 +68,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
+    const id = crypto.randomUUID();
+    const now = new Date();
+    
     const [user] = await db
       .insert(users)
-      .values(insertUser)
+      .values({
+        ...insertUser,
+        id,
+        role: insertUser.role || "user",
+        createdAt: now,
+      } as any)
       .returning();
     return user;
   }
@@ -64,7 +86,7 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
     const [user] = await db
       .update(users)
-      .set(updates)
+      .set(updates as any)
       .where(eq(users.id, id))
       .returning();
     return user || undefined;
@@ -116,14 +138,17 @@ export class DatabaseStorage implements IStorage {
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1);
+    const id = crypto.randomUUID();
 
     const [resetToken] = await db
       .insert(passwordResetTokens)
       .values({
+        id,
         userId,
         token,
         expiresAt,
-      })
+        createdAt: new Date(),
+      } as any)
       .returning();
     return resetToken;
   }
@@ -145,14 +170,14 @@ export class DatabaseStorage implements IStorage {
   async markPasswordResetTokenUsed(id: string): Promise<void> {
     await db
       .update(passwordResetTokens)
-      .set({ usedAt: new Date() })
+      .set({ usedAt: new Date() } as any)
       .where(eq(passwordResetTokens.id, id));
   }
 
   async invalidateUserPasswordResetTokens(userId: string): Promise<void> {
     await db
       .update(passwordResetTokens)
-      .set({ usedAt: new Date() })
+      .set({ usedAt: new Date() } as any)
       .where(
         and(
           eq(passwordResetTokens.userId, userId),
@@ -170,9 +195,14 @@ export class DatabaseStorage implements IStorage {
     details?: string;
     ipAddress?: string;
   }): Promise<AuditLog> {
+    const id = crypto.randomUUID();
     const [auditLog] = await db
       .insert(auditLogs)
-      .values(log)
+      .values({
+        ...log,
+        id,
+        createdAt: new Date(),
+      } as any)
       .returning();
     return auditLog;
   }
@@ -193,3 +223,5 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+
+export type { User, InsertUser, UserWithoutPassword, PasswordResetToken, AuditLog, ActionType };
