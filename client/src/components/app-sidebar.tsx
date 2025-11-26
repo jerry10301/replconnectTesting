@@ -4,7 +4,8 @@ import {
   Users, 
   LogOut, 
   Shield,
-  User as UserIcon
+  User as UserIcon,
+  UserCircle
 } from "lucide-react";
 import {
   Sidebar,
@@ -45,6 +46,14 @@ const userMenuItems = [
   },
 ];
 
+const accountMenuItems = [
+  {
+    title: "My Profile",
+    url: "/profile",
+    icon: UserCircle,
+  },
+];
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout, isAdmin } = useAuth();
@@ -82,6 +91,28 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === item.url}
+                    data-testid={`nav-${item.title.toLowerCase().replace(" ", "-")}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        
+        <SidebarGroup>
+          <SidebarGroupLabel>Account</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {accountMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild 

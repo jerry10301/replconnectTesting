@@ -9,7 +9,7 @@ import {
   generateToken,
   type AuthenticatedRequest 
 } from "./auth";
-import { loginSchema, createUserSchema, updateUserSchema } from "@shared/schema";
+import { loginSchema, createUserSchema, updateUserSchema, updateProfileSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -190,6 +190,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Get stats error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/profile", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.user.id);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Get profile error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/profile", authMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const result = updateProfileSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Validation error", 
+          errors: result.error.flatten().fieldErrors 
+        });
+      }
+
+      const { name, email, currentPassword, newPassword } = result.data;
+      const user = await storage.getUser(req.user.id);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const updates: Partial<{ name: string; email: string; password: string }> = {};
+
+      if (name) {
+        updates.name = name;
+      }
+
+      if (email && email !== user.email) {
+        const existingEmail = await storage.getUserByEmail(email);
+        if (existingEmail) {
+          return res.status(400).json({ message: "Email already exists" });
+        }
+        updates.email = email;
+      }
+
+      if (newPassword && currentPassword) {
+        const isValid = await comparePassword(currentPassword, user.password);
+        if (!isValid) {
+          return res.status(400).json({ message: "Current password is incorrect" });
+        }
+        updates.password = await hashPassword(newPassword);
+      }
+
+      if (Object.keys(updates).length === 0) {
+        const { password: _, ...userWithoutPassword } = user;
+        return res.json(userWithoutPassword);
+      }
+
+      const updatedUser = await storage.updateUser(req.user.id, updates);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = updatedUser;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Update profile error:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   });

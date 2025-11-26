@@ -12,6 +12,7 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import UsersPage from "@/pages/users";
+import ProfilePage from "@/pages/profile";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ 
@@ -95,6 +96,12 @@ function Router() {
       <Route path="/users">
         <AuthenticatedLayout>
           <ProtectedRoute component={UsersPage} adminOnly />
+        </AuthenticatedLayout>
+      </Route>
+
+      <Route path="/profile">
+        <AuthenticatedLayout>
+          <ProtectedRoute component={ProfilePage} />
         </AuthenticatedLayout>
       </Route>
       
